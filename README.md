@@ -1,5 +1,15 @@
 # hunav_gazebo_wrapper
 
+## TODO / Fix
+
+* fix tb3_cafe.launch.py or add model
+* add if case for collision objects
+
+## Added by Kalemat
+
+* parameters in world Generator for turtlebot2_gazebo model
+* added collisions object for lidar without GPU
+
 **This is a work in progress version**
 
 A ROS2 wrapper to use the [HuNavSim](https://github.com/robotics-upo/hunav_sim) with the Gazebo Simulator (tested with ROS Humble and Gazebo 11). 

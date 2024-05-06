@@ -124,6 +124,9 @@ namespace hunav
     bool goalReceived;
     std::string goalTopic;
 
+    /// \brief Update collision cylinder for actors, if they are added to world file
+    bool update_collision_cylinder;
+
     /// \brief List of models to ignore. Used for vector field
     std::vector<std::string> ignoreModels;
   };
@@ -163,6 +166,15 @@ namespace hunav
       hnav_->waitForGoal = false;
       RCLCPP_INFO(hnav_->rosnode->get_logger(),
                   "PARAMETER USE_NAVGOAL_TO_START IS NOT IN THE WORLD FILE!!");
+    }
+
+    if (_sdf->HasElement("update_collision_cylinder"))
+      hnav_->update_collision_cylinder = _sdf->Get<bool>("update_collision_cylinder");
+    else
+    {
+      hnav_->update_collision_cylinder = false;
+      RCLCPP_INFO(hnav_->rosnode->get_logger(),
+                  "PARAMETER UPDATE_COLLISON_CYLINDER IS NOT IN THE WORLD FILE!!");
     }
 
     if (hnav_->waitForGoal)
@@ -745,14 +757,16 @@ namespace hunav
     // update the Gazebo actors
     for (auto a : _agents.agents)
     {
-
       // auto model =
       // boost::dynamic_pointer_cast<gazebo::physics::Model>(entity);
       gazebo::physics::ModelPtr model = world->ModelByName(a.name);
       gazebo::physics::ActorPtr actor =
           boost::dynamic_pointer_cast<gazebo::physics::Actor>(model);
-
       ignition::math::Pose3d actorPose = actor->WorldPose();
+
+
+
+      // update actor
       double yaw = normalizeAngle(a.yaw + M_PI_2);
       double currAngle = actorPose.Rot().Yaw();
       double diff = normalizeAngle(yaw - currAngle);
@@ -773,7 +787,7 @@ namespace hunav
       actorPose.Pos().X(a.position.position.x);
       actorPose.Pos().Y(a.position.position.y);
       actorPose.Rot() = ignition::math::Quaterniond(1.5707, 0, yaw);
-
+      
       // The human agents do not have collisions.
       // When the simulation starts, they move to zero height
       // (in the middle of their bodies approximately)
@@ -830,6 +844,21 @@ namespace hunav
       double distanceTraveled =
           (actorPose.Pos() - actor->WorldPose().Pos()).Length();
 
+      // update collision cylinder
+      gazebo::physics::ModelPtr model_collision;
+      gazebo::physics::ModelPtr actor_collision;
+      ignition::math::Pose3d actorPose_collision;
+      if(update_collision_cylinder)
+      {
+        model_collision = world->ModelByName(a.name + "_collision");
+        actor_collision =
+            boost::dynamic_pointer_cast<gazebo::physics::Model>(model_collision);
+        actorPose_collision.Pos().X(a.position.position.x);
+        actorPose_collision.Pos().Y(a.position.position.y);
+        actorPose_collision.Pos().Z(0.0);
+        actorPose_collision.Rot() = ignition::math::Quaterniond(0, 0, 0);
+      }
+
       // RCLCPP_INFO(rosnode->get_logger(),
       //             "UpdateGazeboPeds updating... actor id:%i, pose x:%.2f, "
       //             "y:%.2f, th:%.2f",
@@ -838,6 +867,10 @@ namespace hunav
       bool is_paused = world->IsPaused();
       world->SetPaused(true);
       model->SetWorldPose(actorPose); //, true, true); // false, false);
+      if(update_collision_cylinder)
+      {
+        actor_collision->SetWorldPose(actorPose_collision);
+      }
       world->SetPaused(is_paused);
 
       // actor->SetLinearVel(entity_lin_vel);

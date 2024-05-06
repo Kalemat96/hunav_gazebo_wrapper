@@ -86,6 +86,8 @@ void WorldGenerator::readPluginParams() {
       "global_frame_to_publish", std::string("map"));
   plug_use_navgoal_to_start_ =
       this->declare_parameter<bool>("use_navgoal_to_start", false);
+  plug_insert_collision_cylinder_ =
+      this->declare_parameter<bool>("insert_collision_cylinder", false);
   plug_navgoal_topic_ = this->declare_parameter<std::string>(
       "navgoal_topic", std::string("goal_pose"));
   this->declare_parameter(std::string("ignore_models"), rclcpp::ParameterType::PARAMETER_STRING);
@@ -286,6 +288,37 @@ bool WorldGenerator::processXML() {
 
   }
 
+  // Insert ode parameters in the XML
+  tinyxml2::XMLElement *newOde = doc.NewElement("ode");
+  doc.FirstChildElement("sdf")->FirstChildElement("world")->FirstChildElement("physics")->InsertEndChild(
+      newOde);
+
+  tinyxml2::XMLElement *solver = doc.NewElement("solver");
+  doc.FirstChildElement("sdf")->FirstChildElement("world")->FirstChildElement("physics")->FirstChildElement("ode")->InsertEndChild(
+      solver);
+  tinyxml2::XMLElement *doc_solver = doc.FirstChildElement("sdf")
+                                    ->FirstChildElement("world")
+                                    ->FirstChildElement("physics")
+                                    ->FirstChildElement("ode")
+                                    ->FirstChildElement("solver");
+
+  tinyxml2::XMLElement *solver_type = doc.NewElement("type");
+  solver_type->SetText("quick");
+  tinyxml2::XMLElement *iters = doc.NewElement("iters");
+  iters->SetText(150);
+  tinyxml2::XMLElement *precon_iters = doc.NewElement("precon_iters");
+  precon_iters->SetText(0);
+  tinyxml2::XMLElement *sor = doc.NewElement("sor");
+  sor->SetText(1.400000);
+  tinyxml2::XMLElement *use_dynamic = doc.NewElement("use_dynamic_moi_rescaling");
+  use_dynamic->SetText(1);
+
+  doc_solver->InsertFirstChild(solver_type);
+  doc_solver->InsertEndChild(iters);
+  doc_solver->InsertEndChild(precon_iters);
+  doc_solver->InsertEndChild(sor);
+  doc_solver->InsertEndChild(use_dynamic);
+
   // CREATE PLUGIN TAG
   tinyxml2::XMLElement *pNewPlugin = doc.NewElement("plugin");
   pNewPlugin->SetAttribute("name", "hunav_plugin");
@@ -304,6 +337,9 @@ bool WorldGenerator::processXML() {
       doc.NewElement("global_frame_to_publish");
   pGlobalFrame->SetText(plug_global_frame_.c_str());
 
+  tinyxml2::XMLElement *pUpdateCollisionCylinder = doc.NewElement("update_collision_cylinder");
+  pUpdateCollisionCylinder->SetText(plug_insert_collision_cylinder_);
+
   tinyxml2::XMLElement *pUseGoal = doc.NewElement("use_navgoal_to_start");
   pUseGoal->SetText(plug_use_navgoal_to_start_);
   tinyxml2::XMLElement *pGoalTopic = doc.NewElement("navgoal_topic");
@@ -315,6 +351,12 @@ bool WorldGenerator::processXML() {
     // tinyxml2::XMLElement *pm = doc.NewElement("model");
     pModels.push_back(doc.NewElement("model"));
     pModels.back()->SetText(st.c_str());
+  }
+
+  // ignore collisions
+  for (auto a : agents_.agents) {
+    pModels.push_back(doc.NewElement("model"));
+    pModels.back()->SetText((a.name + "_collision").c_str());
   }
 
   // Insert plugin in the XML
@@ -329,7 +371,8 @@ bool WorldGenerator::processXML() {
   plugin->InsertAfterChild(pRobot, pGazebo);
   plugin->InsertAfterChild(pGazebo, pGlobalFrame);
   plugin->InsertAfterChild(pGlobalFrame, pUseGoal);
-  plugin->InsertAfterChild(pUseGoal, pGoalTopic);
+  plugin->InsertAfterChild(pUseGoal, pUpdateCollisionCylinder);
+  plugin->InsertAfterChild(pUpdateCollisionCylinder, pGoalTopic);
   plugin->InsertAfterChild(pGoalTopic, pIgnoreModels);
   tinyxml2::XMLElement *ignore = doc.FirstChildElement("sdf")
                                      ->FirstChildElement("world")
@@ -345,6 +388,8 @@ bool WorldGenerator::processXML() {
   // CREATE ACTORS
   bool first = true;
   for (auto a : agents_.agents) {
+
+    // create actor element
     tinyxml2::XMLElement *pNewActor = doc.NewElement("actor");
     pNewActor->SetAttribute("name", a.name.c_str());
 
@@ -410,6 +455,33 @@ bool WorldGenerator::processXML() {
     tinyxml2::XMLElement *pInterpolate1 = doc.NewElement("interpolate_x");
     pInterpolate1->SetText("true");
 
+    // // Create collision element 
+    // https://classic.gazebosim.org/tutorials?tut=actor&cat=build_robot
+    tinyxml2::XMLElement *pNewActorCollision = doc.NewElement("model");
+    pNewActorCollision->SetAttribute("name", (a.name + "_collision").c_str());
+    tinyxml2::XMLElement *pCollisionLink = doc.NewElement("link");
+    pCollisionLink->SetAttribute("name", (a.name + "_collision_link").c_str());
+
+    double radius = 0.3;
+    double length = 0.5;
+    tinyxml2::XMLElement *pCollisionVisual = doc.NewElement("visual");
+    pCollisionVisual->SetAttribute("name", (a.name + "_collision_visual").c_str());
+    tinyxml2::XMLElement *pCollisionVisualGeometry = doc.NewElement("geometry");
+    tinyxml2::XMLElement *pCollisionVisualCylinder = doc.NewElement("cylinder");
+    tinyxml2::XMLElement *pCollisionVisualCylinderRadius = doc.NewElement("radius");
+    pCollisionVisualCylinderRadius->SetText(radius);
+    tinyxml2::XMLElement *pCollisionVisualCylinderLength = doc.NewElement("length");
+    pCollisionVisualCylinderLength->SetText(length);
+
+    tinyxml2::XMLElement *pCollisionCollision = doc.NewElement("collision");
+    pCollisionCollision->SetAttribute("name", (a.name + "_collision_collision").c_str());
+    tinyxml2::XMLElement *pCollisionCollisionGeometry = doc.NewElement("geometry");
+    tinyxml2::XMLElement *pCollisionCollisionCylinder = doc.NewElement("cylinder");
+    tinyxml2::XMLElement *pCollisionCollisionCylinderRadius = doc.NewElement("radius");
+    pCollisionCollisionCylinderRadius->SetText(radius);
+    tinyxml2::XMLElement *pCollisionCollisionCylinderLength = doc.NewElement("length");
+    pCollisionCollisionCylinderLength->SetText(length);
+
     // Insert actor in the XML
     if (first) {
       first = false;
@@ -451,6 +523,7 @@ bool WorldGenerator::processXML() {
       animation_active->InsertFirstChild(pFilename2);
       animation_active->InsertAfterChild(pFilename2, pScale2);
       animation_active->InsertAfterChild(pScale2, pInterpolate1);
+
     } else {
       tinyxml2::XMLElement *pInclude = doc.FirstChildElement("sdf")
                                            ->FirstChildElement("world")
@@ -491,6 +564,34 @@ bool WorldGenerator::processXML() {
       animation_active->InsertAfterChild(pFilename2, pScale2);
       animation_active->InsertAfterChild(pScale2, pInterpolate1);
     }
+    
+    // Insert collision
+    if(plug_insert_collision_cylinder_)
+    {
+      doc.FirstChildElement("sdf")
+      ->FirstChildElement("world")
+      ->InsertEndChild(pNewActorCollision);
+
+      tinyxml2::XMLElement *actorsCollision = doc.FirstChildElement("sdf")
+                                          ->FirstChildElement("world")
+                                          ->LastChildElement("model");
+
+      actorsCollision->InsertFirstChild(pPose);
+      actorsCollision->InsertEndChild(pCollisionLink)->InsertFirstChild(pCollisionVisual)
+      ->InsertFirstChild(pCollisionVisualGeometry)->InsertFirstChild(pCollisionVisualCylinder)
+      ->InsertFirstChild(pCollisionVisualCylinderRadius);
+      actorsCollision->InsertEndChild(pCollisionLink)->InsertFirstChild(pCollisionVisual)
+      ->InsertFirstChild(pCollisionVisualGeometry)->InsertFirstChild(pCollisionVisualCylinder)
+      ->InsertEndChild(pCollisionVisualCylinderLength);
+
+      actorsCollision->InsertEndChild(pCollisionLink)->InsertEndChild(pCollisionCollision)
+      ->InsertFirstChild(pCollisionCollisionGeometry)->InsertFirstChild(pCollisionCollisionCylinder)
+      ->InsertFirstChild(pCollisionCollisionCylinderRadius);
+      actorsCollision->InsertEndChild(pCollisionLink)->InsertEndChild(pCollisionCollision)
+      ->InsertFirstChild(pCollisionCollisionGeometry)->InsertFirstChild(pCollisionCollisionCylinder)
+      ->InsertEndChild(pCollisionCollisionCylinderLength);
+    }
+
   }
 
   // save new world file
