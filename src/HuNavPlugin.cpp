@@ -20,7 +20,7 @@
 // #include <functional>
 #include <stdio.h>
 #include <string>
-
+#include <cmath>
 // #include <ignition/math.hh>
 // #include <ignition/math/gzmath.hh>
 #include <hunav_gazebo_wrapper/HuNavPlugin.h>
@@ -375,7 +375,7 @@ bool HuNavPluginPrivate::InitializeRobot()
     ignition::math::Vector3d linvel = robotModel->WorldLinearVel();
     robotAgent.velocity.linear.x = linvel.X();
     robotAgent.velocity.linear.y = linvel.Y();
-    robotAgent.linear_vel = linvel.Length();
+    robotAgent.linear_vel = sqrt(linvel.X() * linvel.X() + linvel.Y() * linvel.Y());
     ignition::math::Vector3d angvel = robotModel->WorldAngularVel();
     robotAgent.velocity.angular.z = angvel.Z();
     robotAgent.angular_vel = angvel.Z();
@@ -413,9 +413,8 @@ void HuNavPluginPrivate::InitializeAgents()
     // const hunav_msgs::msg::Agents &agents = result.get()->agents;
     auto res = *result.get();
     const hunav_msgs::msg::Agents agents = res.agents;
-
+    init_pedestrians = res.agents;
     // if (result.success) {
-    // init_pedestrians = result.get()->agents;
     RCLCPP_INFO(rosnode->get_logger(), "Received %i agents from service /get_agents", (int)agents.agents.size());
     pedestrians.clear();
 
@@ -457,7 +456,7 @@ void HuNavPluginPrivate::InitializeAgents()
       ag.desired_velocity = agent.desired_velocity;
       ag.velocity.linear.x = linvel.X();
       ag.velocity.linear.y = linvel.Y();
-      ag.linear_vel = linvel.Length();
+      ag.linear_vel = sqrt(linvel.X() * linvel.X() + linvel.Y() * linvel.Y());
       ignition::math::Vector3d angvel = model->WorldAngularVel();
       ag.velocity.angular.z = angvel.Z();
       ag.angular_vel = angvel.Z();
@@ -599,7 +598,7 @@ bool HuNavPluginPrivate::GetRobot()
   ignition::math::Vector3d linvel = robotModel->WorldLinearVel();
   robotAgent.velocity.linear.x = linvel.X();
   robotAgent.velocity.linear.y = linvel.Y();
-  robotAgent.linear_vel = linvel.Length();
+  robotAgent.linear_vel = sqrt(linvel.X() * linvel.X() + linvel.Y() * linvel.Y());
   ignition::math::Vector3d angvel = robotModel->WorldAngularVel();
   robotAgent.velocity.angular.z = angvel.Z();
   robotAgent.angular_vel = angvel.Z();
