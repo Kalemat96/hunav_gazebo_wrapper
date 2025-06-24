@@ -537,7 +537,7 @@ bool WorldGenerator::processXML()
     tinyxml2::XMLElement *pCollisionLink = doc.NewElement("link");
     pCollisionLink->SetAttribute("name", (a.name + "_collision_link").c_str());
 
-    double radius = 0.3;
+    double radius = 0.22;
     double length = 0.5;
     tinyxml2::XMLElement *pCollisionVisual = doc.NewElement("visual");
     pCollisionVisual->SetAttribute("name", (a.name + "_collision_visual").c_str());

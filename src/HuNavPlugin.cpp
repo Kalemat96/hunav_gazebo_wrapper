@@ -365,7 +365,7 @@ bool HuNavPluginPrivate::InitializeRobot()
     robotAgent.behavior.state = hunav_msgs::msg::AgentBehavior::BEH_NO_ACTIVE;
     robotAgent.name = robotName;
     robotAgent.group_id = -1;
-    robotAgent.radius = 0.35;
+    robotAgent.radius = 0.22;
     robotAgent.position.position.x = pos.X();
     robotAgent.position.position.y = pos.Y();
     tf2::Quaternion myQuaternion;
